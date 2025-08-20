@@ -36,7 +36,9 @@ namespace OptionsLocalization
             var optionsSection = configuration.GetSection($"{nameof(OptionsLocalization)}:{typeof(TOptions).Name}");
             this.supportedCultures = GetSupportedCultures(optionsSection).ToArray();
 
+            optionsMonitorCache.Clear();
             this.listener = ChangeToken.OnChange(optionsSection.GetReloadToken, OnOptionsChange);
+
             void OnOptionsChange()
             {
                 optionsMonitorCache.Clear();
@@ -57,7 +59,7 @@ namespace OptionsLocalization
 
         public TOptions Get(string culture)
         {
-            return this.Get(CultureInfo.GetCultureInfo(culture));
+            return this.optionsMonitor.Get(culture);
         }
 
         public TOptions Get(CultureInfo culture)
