@@ -9,10 +9,10 @@ namespace OptionsLocalization
 {
     sealed class OptionsLocalizerBuilder : IOptionsLocalizerBuilder
     {
-        public required CultureInfo DefaultCulture;
-        public required CultureInfo[] ExpectedCultures;
-        public required IServiceCollection Services;
-        public required IConfiguration Configuration;
+        public required CultureInfo DefaultCulture { get; init; }
+        public required CultureInfo[] ExpectedCultures { get; init; }
+        public required IServiceCollection Services { get; init; }
+        public required IConfiguration Configuration { get; init; }
 
         public IOptionsLocalizerBuilder Configure<TOptions>() where TOptions : class, new()
         {

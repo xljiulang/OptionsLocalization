@@ -9,18 +9,20 @@ using System.Threading;
 
 namespace OptionsLocalization
 {
-    sealed class OptionsLocalizer<TOptions> : IOptionsLocalizer, IOptionsLocalizer<TOptions> where TOptions : class, new()
+    sealed class OptionsLocalizer<TOptions> : IOptionsLocalizer, IOptionsLocalizer<TOptions>, IDisposable where TOptions : class, new()
     {
-        private readonly IOptions<OptionsLocalizerOptions<TOptions>> options;
+        private readonly OptionsLocalizerOptions<TOptions> options;
         private readonly IOptionsMonitor<TOptions> optionsMonitor;
+        private readonly IDisposable listener;
+        private CultureInfo[] supportedCultures;
 
         public Type OptionsType => typeof(TOptions);
 
         public TOptions CurrentValue => this.Get(Thread.CurrentThread.CurrentCulture);
 
-        public CultureInfo[] SupportedCultures { get; private set; }
+        public CultureInfo[] SupportedCultures => this.supportedCultures;
 
-        public CultureInfo[] ExpectedCultures => this.options.Value.ExpectedCultures;
+        public CultureInfo[] ExpectedCultures => this.options.ExpectedCultures;
 
         public OptionsLocalizer(
             IConfiguration configuration,
@@ -28,17 +30,17 @@ namespace OptionsLocalization
             IOptionsMonitor<TOptions> optionsMonitor,
             IOptionsMonitorCache<TOptions> optionsMonitorCache)
         {
-            this.options = options;
+            this.options = options.Value;
             this.optionsMonitor = optionsMonitor;
 
             var optionsSection = configuration.GetSection($"{nameof(OptionsLocalization)}:{typeof(TOptions).Name}");
-            this.SupportedCultures = GetSupportedCultures(optionsSection).ToArray();
+            this.supportedCultures = GetSupportedCultures(optionsSection).ToArray();
 
-            ChangeToken.OnChange(optionsSection.GetReloadToken, OnOptionsChange);
+            this.listener = ChangeToken.OnChange(optionsSection.GetReloadToken, OnOptionsChange);
             void OnOptionsChange()
             {
                 optionsMonitorCache.Clear();
-                this.SupportedCultures = GetSupportedCultures(optionsSection).ToArray();
+                this.supportedCultures = GetSupportedCultures(optionsSection).ToArray();
             }
         }
 
@@ -76,7 +78,7 @@ namespace OptionsLocalization
             {
                 if (OptionsLocalizer.TryGetCultureInfo(name, out var culture) == false)
                 {
-                    culture = this.options.Value.DefaultCulture;
+                    culture = this.options.DefaultCulture;
                 }
                 listener(optionsValue, culture);
             }
@@ -95,6 +97,11 @@ namespace OptionsLocalization
             {
                 listener(optionsValue, culture);
             }
+        }
+
+        public void Dispose()
+        {
+            this.listener.Dispose();
         }
     }
 }
