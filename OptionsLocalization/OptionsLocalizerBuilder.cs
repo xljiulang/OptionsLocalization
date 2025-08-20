@@ -37,16 +37,21 @@ namespace OptionsLocalization
                 this.optionsSection = builder.Configuration.GetSection($"{nameof(OptionsLocalization)}:{typeof(TOptions).Name}");
             }
 
-
             /// <summary>
             /// 绑定 Options 到各个文化信息的配置节点
             /// </summary>
             public void BindCultureSections()
             {
-                var targetCultures = this.GetOptionsSectionCultures();
-                foreach (var culture in targetCultures)
+                var targetCultures = new HashSet<CultureInfo>();
+                foreach (var cultureSection in this.optionsSection.GetChildren())
                 {
-                    BindCultureSection(culture);
+                    if (OptionsLocalizer.TryGetCultureInfo(cultureSection.Key, out var culture))
+                    {
+                        if (targetCultures.Add(culture))
+                        {
+                            BindCultureSection(culture);
+                        }
+                    }
                 }
 
                 foreach (var culture in this.expectedCultures)
@@ -59,44 +64,6 @@ namespace OptionsLocalization
             }
 
             /// <summary>
-            /// 注册 Options的 IOptionsLocalizer 服务
-            /// </summary>
-            public void AddOptionsLocalizer()
-            {
-                var optionsSectionChangeTokenSource = new ConfigurationChangeTokenSource<OptionsLocalizerOptions<TOptions>>(Options.DefaultName, this.optionsSection);
-                this.services.AddSingleton<IOptionsChangeTokenSource<OptionsLocalizerOptions<TOptions>>>(optionsSectionChangeTokenSource);
-                this.services.Configure<OptionsLocalizerOptions<TOptions>>(options =>
-                {
-                    options.DefaultCulture = this.defaultCulture;
-                    options.ExpectedCultures = this.expectedCultures;
-                    options.SupportedCultures = this.GetOptionsSectionCultures();
-                });
-
-                this.services.TryAddTransient<IOptionsFactory<TOptions>, CultureOptionsFactory<TOptions>>();
-                this.services.TryAddSingleton<OptionsLocalizer<TOptions>>();
-                this.services.TryAddSingleton<IOptionsLocalizer<TOptions>>(s => s.GetRequiredService<OptionsLocalizer<TOptions>>());
-                this.services.TryAddTransient(s => s.GetRequiredService<OptionsLocalizer<TOptions>>().CurrentValue);
-                this.services.AddSingleton<IOptionsLocalizer>(s => s.GetRequiredService<OptionsLocalizer<TOptions>>());
-            }
-
-            /// <summary>
-            /// 从 Options 的配置节点中获取文化信息列表
-            /// </summary>
-            /// <returns></returns>
-            private HashSet<CultureInfo> GetOptionsSectionCultures()
-            {
-                var supportedCultures = new HashSet<CultureInfo>();
-                foreach (var cultureSection in this.optionsSection.GetChildren())
-                {
-                    if (OptionsLocalizer.TryGetCultureInfo(cultureSection.Key, out var culture))
-                    {
-                        supportedCultures.Add(culture);
-                    }
-                }
-                return supportedCultures;
-            }
-
-            /// <summary>
             /// 绑定 Options 到指定文化信息的节点
             /// </summary>
             /// <param name="culture"></param>
@@ -105,6 +72,24 @@ namespace OptionsLocalization
                 var name = this.defaultCulture.Equals(culture) ? Options.DefaultName : culture.Name;
                 var cultureSection = this.optionsSection.GetSection(culture.Name);
                 this.services.Configure<TOptions>(name, cultureSection);
+            }
+
+            /// <summary>
+            /// 注册 Options的 IOptionsLocalizer 服务
+            /// </summary>
+            public void AddOptionsLocalizer()
+            {
+                this.services.Configure<OptionsLocalizerOptions<TOptions>>(options =>
+                {
+                    options.DefaultCulture = this.defaultCulture;
+                    options.ExpectedCultures = this.expectedCultures;
+                });
+
+                this.services.TryAddTransient<IOptionsFactory<TOptions>, CultureOptionsFactory<TOptions>>();
+                this.services.TryAddSingleton<OptionsLocalizer<TOptions>>();
+                this.services.TryAddSingleton<IOptionsLocalizer<TOptions>>(s => s.GetRequiredService<OptionsLocalizer<TOptions>>());
+                this.services.TryAddTransient(s => s.GetRequiredService<OptionsLocalizer<TOptions>>().CurrentValue);
+                this.services.AddSingleton<IOptionsLocalizer>(s => s.GetRequiredService<OptionsLocalizer<TOptions>>());
             }
         }
     }

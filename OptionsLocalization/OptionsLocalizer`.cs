@@ -1,5 +1,8 @@
-﻿using Microsoft.Extensions.Options;
+﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Primitives;
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
@@ -8,23 +11,46 @@ namespace OptionsLocalization
 {
     sealed class OptionsLocalizer<TOptions> : IOptionsLocalizer, IOptionsLocalizer<TOptions> where TOptions : class, new()
     {
-        private readonly IOptionsMonitor<OptionsLocalizerOptions<TOptions>> options;
+        private readonly IOptions<OptionsLocalizerOptions<TOptions>> options;
         private readonly IOptionsMonitor<TOptions> optionsMonitor;
 
         public Type OptionsType => typeof(TOptions);
 
         public TOptions CurrentValue => this.Get(Thread.CurrentThread.CurrentCulture);
 
-        public CultureInfo[] SupportedCultures => this.options.CurrentValue.SupportedCultures.ToArray();
+        public CultureInfo[] SupportedCultures { get; private set; }
 
-        public CultureInfo[] ExpectedCultures => this.options.CurrentValue.ExpectedCultures;
+        public CultureInfo[] ExpectedCultures => this.options.Value.ExpectedCultures;
 
         public OptionsLocalizer(
-            IOptionsMonitor<OptionsLocalizerOptions<TOptions>> options,
-            IOptionsMonitor<TOptions> optionsMonitor)
+            IConfiguration configuration,
+            IOptions<OptionsLocalizerOptions<TOptions>> options,
+            IOptionsMonitor<TOptions> optionsMonitor,
+            IOptionsMonitorCache<TOptions> optionsMonitorCache)
         {
             this.options = options;
             this.optionsMonitor = optionsMonitor;
+
+            var optionsSection = configuration.GetSection($"{nameof(OptionsLocalization)}:{typeof(TOptions).Name}");
+            this.SupportedCultures = GetSupportedCultures(optionsSection).ToArray();
+
+            ChangeToken.OnChange(optionsSection.GetReloadToken, OnOptionsChange);
+            void OnOptionsChange()
+            {
+                optionsMonitorCache.Clear();
+                this.SupportedCultures = GetSupportedCultures(optionsSection).ToArray();
+            }
+        }
+
+        private static IEnumerable<CultureInfo> GetSupportedCultures(IConfigurationSection optionsSection)
+        {
+            foreach (var cultureSection in optionsSection.GetChildren())
+            {
+                if (OptionsLocalizer.TryGetCultureInfo(cultureSection.Key, out var culture))
+                {
+                    yield return culture;
+                }
+            }
         }
 
         public TOptions Get(string culture)
@@ -34,18 +60,7 @@ namespace OptionsLocalization
 
         public TOptions Get(CultureInfo culture)
         {
-            if (string.IsNullOrEmpty(culture.Name) ||
-                this.options.CurrentValue.DefaultCulture.Equals(culture))
-            {
-                return this.optionsMonitor.Get(Options.DefaultName);
-            }
-
-            if (this.options.CurrentValue.SupportedCultures.Contains(culture))
-            {
-                return this.optionsMonitor.Get(culture.Name);
-            }
-
-            return Get(culture.Parent);
+            return this.optionsMonitor.Get(culture.Name);
         }
 
         /// <summary>
@@ -61,7 +76,7 @@ namespace OptionsLocalization
             {
                 if (OptionsLocalizer.TryGetCultureInfo(name, out var culture) == false)
                 {
-                    culture = this.options.CurrentValue.DefaultCulture;
+                    culture = this.options.Value.DefaultCulture;
                 }
                 listener(optionsValue, culture);
             }
