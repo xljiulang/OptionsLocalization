@@ -72,3 +72,16 @@ public class HomeController
 2. 新建`AppOptions`子目录(保持与选项类型名一致)
 3. 新建`zh.json`、`zh-CN.json`等包含`{}` json 结构的语言文件
 4. 启动运行你的项目，在`AppOptions`子目录找到`.value`文件，粘贴到对应的`.json`语言文件并翻译修改
+
+```
+localizations/
+├───{A-OptionsName}/
+│   ├── zh.json
+│   ├── zh-Hans.json
+│   └── zh-CN.json
+│ 
+└───{B-OptionsName}/
+    ├── zh.json
+    ├── zh-Hans.json
+    └── zh-CN.json
+```
