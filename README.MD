@@ -1,6 +1,9 @@
 ## OptionsLocalization
 小有意思的一个项目，使用 json 配置文件做 [Options](https://learn.microsoft.com/zh-cn/dotnet/core/extensions/options) 本地化
 
+### Nuget
+[OptionsLocalization](https://www.nuget.org/packages/OptionsLocalization)
+
 ### 使用步骤
 #### 1 定义你的选项
 ```c#
