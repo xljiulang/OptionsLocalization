@@ -24,7 +24,10 @@ namespace OptionsLocalization
         /// <returns></returns>
         public static IOptionsLocalizationBuilder AddJsonLocalization(this IOptionsLocalizationBuilder builder, string localizationRoot = "localizations")
         {
-            builder.CheckLocalizationRoot(localizationRoot);
+            if (builder.CheckLocalizationRoot(localizationRoot) == false)
+            {
+                return builder;
+            }
 
             foreach (var optionsPath in Directory.GetDirectories(localizationRoot))
             {
@@ -56,7 +59,7 @@ namespace OptionsLocalization
             return builder;
         }
 
-        private static void CheckLocalizationRoot(this IOptionsLocalizationBuilder builder, string localizationRoot)
+        private static bool CheckLocalizationRoot(this IOptionsLocalizationBuilder builder, string localizationRoot)
         {
             ArgumentException.ThrowIfNullOrEmpty(localizationRoot);
 
@@ -68,13 +71,24 @@ namespace OptionsLocalization
             }
 
             var descriptor = builder.Services.FirstOrDefault(i => i.ServiceType == typeof(LocalizationRoot));
-            if (descriptor != null && descriptor.ImplementationInstance is LocalizationRoot root)
+            var root = descriptor?.ImplementationInstance as LocalizationRoot;
+
+            // 未注册过
+            if (root == null)
             {
-                throw new InvalidOperationException($"Localization root has already been set to '{root.Value}'.");
+                builder.Services.AddSingleton(new LocalizationRoot(localizationRoot));
+                Directory.CreateDirectory(localizationRoot);
+                return true;
             }
 
-            builder.Services.AddSingleton(new LocalizationRoot(localizationRoot));
-            Directory.CreateDirectory(localizationRoot);
+            // 注册过，但值相同
+            var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+            if (string.Equals(root.Value, localizationRoot, comparison))
+            {
+                return false;
+            }
+
+            throw new InvalidOperationException($"Localization root has already been set to '{root.Value}'.");
         }
 
         private static void AddJsonFile(this IOptionsLocalizationBuilder builder, string jsonFilePath)
